@@ -115,7 +115,9 @@ function ObservStruct(initialData) {
             } else {
                 var extra = {}
                 data[key] = add(extra, newValue, key)
-                setState(extend(obs(), extra));
+                if (typeof data[key] === "function") {
+                    setNestedState(key, extend(obs(), extra));
+                }
             }
 
         })
