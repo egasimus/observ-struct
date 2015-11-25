@@ -10,11 +10,11 @@ var blackList = {
 }
 
 function checkBlackList (key) {
-  if (blackList.hasOwnProperty(key)) {
-      throw new Error("cannot create an observ-struct " +
-          "with a key named '" + key + "'.\n" +
-          blackList[key]);
-  }
+    if (blackList.hasOwnProperty(key)) {
+        throw new Error("cannot create an observ-struct " +
+            "with a key named '" + key + "'.\n" +
+            blackList[key]);
+    }
 }
 
 var NO_TRANSACTION = {}
@@ -41,16 +41,16 @@ function ObservStruct(initialData) {
 
     var currentTransaction = NO_TRANSACTION
     function setState(value) {
-      currentTransaction = value
-      obs.set(value)
-      currentTransaction = NO_TRANSACTION
+        currentTransaction = value
+        obs.set(value)
+        currentTransaction = NO_TRANSACTION
     }
 
     var nestedTransaction = NO_TRANSACTION
     function setNestedState(key, value) {
-      nestedTransaction = value;
-      data[key].set(value);
-      nestedTransaction = NO_TRANSACTION
+        nestedTransaction = value;
+        data[key].set(value);
+        nestedTransaction = NO_TRANSACTION
     }
 
     var initial = {}
@@ -61,15 +61,16 @@ function ObservStruct(initialData) {
 
     obs.set(initial)
 
-    function add (state, data, key) {
+    function add (into, from, key) {
         checkBlackList(key)
-        obs[key] = data[key]
+        obs[key] = from[key]
         if (typeof obs[key] === "function") {
-            obs[key](nestedChange.bind(null, key))
-            state[key] = obs[key]()
+            from[key](nestedChange.bind(null, key))
+            into[key] = from[key]()
         } else {
-            state[key] = obs[key]
+            into[key] = from[key]
         }
+        return from[key]
     }
 
     function nestedChange (key, value) {
@@ -113,7 +114,7 @@ function ObservStruct(initialData) {
                 }
             } else {
                 var extra = {}
-                extra[key] = add(extra, newValue, key)
+                data[key] = add(extra, newValue, key)
                 setState(extend(obs(), extra));
             }
 

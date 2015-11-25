@@ -2,6 +2,8 @@ Obj = require('.')
 
 x = Obj({ foo: Obj({ bar: 1}) })
 x(function(lol){ console.log("HEY", lol) })
+console.log(0)
+x.foo.set({'top':'kek'})
 
 y = Obj({ baz: 2 })
 
