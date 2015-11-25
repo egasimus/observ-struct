@@ -8,6 +8,15 @@ var blackList = {
     "_type": "_type is reserved key of observ-struct.\n",
     "_version": "_version is reserved key of observ-struct.\n"
 }
+
+function checkBlackList (key) {
+  if (blackList.hasOwnProperty(key)) {
+      throw new Error("cannot create an observ-struct " +
+          "with a key named '" + key + "'.\n" +
+          blackList[key]);
+  }
+}
+
 var NO_TRANSACTION = {}
 
 function setNonEnumerable(object, key, value) {
@@ -32,28 +41,33 @@ function ObservStruct(struct) {
     var keys = Object.keys(struct)
 
     var initialState = {}
+
     var currentTransaction = NO_TRANSACTION
+    function setState(value) {
+      currentTransaction = value
+      obs.set(value)
+      currentTransaction = NO_TRANSACTION
+    }
+
     var nestedTransaction = NO_TRANSACTION
+    function setNestedState(key, value) {
+      nestedTransaction = value;
+      struct[key].set(value);
+      nestedTransaction = NO_TRANSACTION
+    }
 
     keys.forEach(function (key) {
-        if (blackList.hasOwnProperty(key)) {
-            throw new Error("cannot create an observ-struct " +
-                "with a key named '" + key + "'.\n" +
-                blackList[key]);
-        }
-
-        var observ = struct[key]
-        initialState[key] = typeof observ === "function" ?
-            observ() : observ
+        checkBlackList(key)
+        initialState[key] = typeof struct[key] === "function" ?
+            struct[key]() : struct[key]
     })
 
     var obs = Observ(initialState)
     keys.forEach(function (key) {
-        var observ = struct[key]
-        obs[key] = observ
+        obs[key] = struct[key]
 
-        if (typeof observ === "function") {
-            observ(function (value) {
+        if (typeof struct[key] === "function") {
+            struct[key](function (value) {
                 if (nestedTransaction === value) {
                     return
                 }
@@ -65,9 +79,7 @@ function ObservStruct(struct) {
                     value._diff : value
 
                 setNonEnumerable(state, "_diff", diff)
-                currentTransaction = state
-                obs.set(state)
-                currentTransaction = NO_TRANSACTION
+                setState(state);
             })
         }
     })
@@ -87,16 +99,21 @@ function ObservStruct(struct) {
             return
         }
 
-        keys.forEach(function (key) {
-            var observ = struct[key]
-            var newObservValue = newState[key]
+        Object.keys(newState).forEach(function (key) {
 
-            if (typeof observ === "function" &&
-                observ() !== newObservValue
-            ) {
-                nestedTransaction = newObservValue
-                observ.set(newState[key])
-                nestedTransaction = NO_TRANSACTION
+            if (struct.hasOwnProperty(key)) {
+              if (typeof struct[key] === "function" &&
+                  struct[key]() !== newState[key]
+              ) {
+                  setNestedState(key, newState[key])
+              }
+            } else {
+              checkBlackList(key)
+              obs[key] = newState[key]
+              var state = extend(obs())
+              state[key] = struct[key] = typeof newState[key] === "function" ?
+                  newState[key]() : newState[key]
+              setState(state);
             }
         })
     })
