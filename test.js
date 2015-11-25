@@ -8,16 +8,14 @@ x.foo.set({'top':'kek'})
 y = Obj({ baz: 2 })
 
 z = x();
-console.log(1)
 delete z.foo;
 z.quux = y;
 z.fnord = require('observ')(8);
-
-console.log(2)
+console.log(1)
 x.set(z);
 
-console.log(3)
+console.log(2)
 x.quux.set({top:'kek'})
 
-console.log(4)
+console.log(3)
 x.fnord.set(9001)

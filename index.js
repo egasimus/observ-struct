@@ -58,8 +58,16 @@ function ObservStruct(initialData) {
       , obs     = Observ()
 
     Object.keys(data).forEach(add.bind(null, initial, data))
-
     obs.set(initial)
+
+    var _set = obs.set
+    obs.set = trackDiff
+
+    obs(update)
+    obs._type = "observ-struct"
+    obs._version = "5"
+
+    return obs
 
     function add (into, from, key) {
         checkBlackList(key)
@@ -88,8 +96,7 @@ function ObservStruct(initialData) {
         setState(state);
     }
 
-    var _set = obs.set
-    obs.set = function trackDiff(value) {
+    function trackDiff(value) {
         if (currentTransaction === value) {
             return _set(value)
         }
@@ -99,7 +106,7 @@ function ObservStruct(initialData) {
         _set(newState)
     }
 
-    obs(function (newValue) {
+    function update (newValue) {
         if (currentTransaction === newValue) {
             return
         }
@@ -113,18 +120,12 @@ function ObservStruct(initialData) {
                     setNestedState(key, newValue[key])
                 }
             } else {
-                var extra = {}
-                data[key] = add(extra, newValue, key)
+                add(data, newValue, key)
                 if (typeof data[key] === "function") {
-                    setNestedState(key, extend(obs(), extra));
+                    setNestedState(key, newValue[key]);
                 }
             }
 
         })
-    })
-
-    obs._type = "observ-struct"
-    obs._version = "5"
-
-    return obs
+    }
 }
