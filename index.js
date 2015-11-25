@@ -63,26 +63,30 @@ function ObservStruct(struct) {
     })
 
     var obs = Observ(initialState)
+
     keys.forEach(function (key) {
         obs[key] = struct[key]
 
-        if (typeof struct[key] === "function") {
-            struct[key](function (value) {
-                if (nestedTransaction === value) {
-                    return
-                }
-
-                var state = extend(obs())
-                state[key] = value
-                var diff = {}
-                diff[key] = value && value._diff ?
-                    value._diff : value
-
-                setNonEnumerable(state, "_diff", diff)
-                setState(state);
-            })
+        if (typeof obs[key] === "function") {
+            obs[key](nestedChange.bind(null, key))
         }
     })
+
+    function nestedChange (key, value) {
+        if (nestedTransaction === value) {
+            return
+        }
+
+        var state = extend(obs())
+        state[key] = value
+        var diff = {}
+        diff[key] = value && value._diff ?
+            value._diff : value
+
+        setNonEnumerable(state, "_diff", diff)
+        setState(state);
+    }
+
     var _set = obs.set
     obs.set = function trackDiff(value) {
         if (currentTransaction === value) {
@@ -108,12 +112,16 @@ function ObservStruct(struct) {
                   setNestedState(key, newState[key])
               }
             } else {
-              checkBlackList(key)
-              obs[key] = newState[key]
-              var state = extend(obs())
-              state[key] = struct[key] = typeof newState[key] === "function" ?
-                  newState[key]() : newState[key]
-              setState(state);
+                checkBlackList(key)
+                obs[key] = newState[key]
+                var extra = {}
+                extra[key] = struct[key] =
+                  typeof newState[key] === "function" ?
+                    newState[key]() : newState[key]
+                if (typeof newState[key] === "function") {
+                    newState[key](nestedChange.bind(null, key));
+                }
+                setState(extend(obs(), extra));
             }
         })
     })
