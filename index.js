@@ -37,10 +37,7 @@ function setNonEnumerable(object, key, value) {
 */
 module.exports = ObservStruct
 
-function ObservStruct(struct) {
-    var keys = Object.keys(struct)
-
-    var initialState = {}
+function ObservStruct(initialData) {
 
     var currentTransaction = NO_TRANSACTION
     function setState(value) {
@@ -52,25 +49,28 @@ function ObservStruct(struct) {
     var nestedTransaction = NO_TRANSACTION
     function setNestedState(key, value) {
       nestedTransaction = value;
-      struct[key].set(value);
+      data[key].set(value);
       nestedTransaction = NO_TRANSACTION
     }
 
-    keys.forEach(function (key) {
+    var initial = {}
+      , data    = extend(initialData)
+      , obs     = Observ()
+
+    Object.keys(data).forEach(add.bind(null, initial, data))
+
+    obs.set(initial)
+
+    function add (state, data, key) {
         checkBlackList(key)
-        initialState[key] = typeof struct[key] === "function" ?
-            struct[key]() : struct[key]
-    })
-
-    var obs = Observ(initialState)
-
-    keys.forEach(function (key) {
-        obs[key] = struct[key]
-
+        obs[key] = data[key]
         if (typeof obs[key] === "function") {
             obs[key](nestedChange.bind(null, key))
+            state[key] = obs[key]()
+        } else {
+            state[key] = obs[key]
         }
-    })
+    }
 
     function nestedChange (key, value) {
         if (nestedTransaction === value) {
@@ -98,31 +98,25 @@ function ObservStruct(struct) {
         _set(newState)
     }
 
-    obs(function (newState) {
-        if (currentTransaction === newState) {
+    obs(function (newValue) {
+        if (currentTransaction === newValue) {
             return
         }
 
-        Object.keys(newState).forEach(function (key) {
+        Object.keys(newValue).forEach(function (key) {
 
-            if (struct.hasOwnProperty(key)) {
-              if (typeof struct[key] === "function" &&
-                  struct[key]() !== newState[key]
-              ) {
-                  setNestedState(key, newState[key])
-              }
-            } else {
-                checkBlackList(key)
-                obs[key] = newState[key]
-                var extra = {}
-                extra[key] = struct[key] =
-                  typeof newState[key] === "function" ?
-                    newState[key]() : newState[key]
-                if (typeof newState[key] === "function") {
-                    newState[key](nestedChange.bind(null, key));
+            if (data.hasOwnProperty(key)) {
+                if (typeof data[key] === "function" &&
+                    data[key]() !== newValue[key]
+                ) {
+                    setNestedState(key, newValue[key])
                 }
+            } else {
+                var extra = {}
+                extra[key] = add(extra, newValue, key)
                 setState(extend(obs(), extra));
             }
+
         })
     })
 
