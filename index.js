@@ -40,24 +40,13 @@ module.exports = ObservStruct
 function ObservStruct(initialData) {
 
     var currentTransaction = NO_TRANSACTION
-    function setState(value) {
-        currentTransaction = value
-        obs.set(value)
-        currentTransaction = NO_TRANSACTION
-    }
+    var nestedTransaction  = NO_TRANSACTION
 
-    var nestedTransaction = NO_TRANSACTION
-    function setNestedState(key, value) {
-        nestedTransaction = value;
-        data[key].set(value);
-        nestedTransaction = NO_TRANSACTION
-    }
-
-    var initial = {}
+    var obs     = Observ()
+      , initial = {}
       , data    = extend(initialData)
-      , obs     = Observ()
 
-    Object.keys(data).forEach(add.bind(null, initial, data))
+    Object.keys(data).forEach(initKey)
     obs.set(initial)
 
     var _set = obs.set
@@ -69,16 +58,15 @@ function ObservStruct(initialData) {
 
     return obs
 
-    function add (into, from, key) {
+    function initKey (key) {
         checkBlackList(key)
-        obs[key] = from[key]
+        obs[key] = data[key]
         if (typeof obs[key] === "function") {
-            from[key](nestedChange.bind(null, key))
-            into[key] = from[key]()
+            data[key](nestedChange.bind(null, key))
+            initial[key] = data[key]()
         } else {
-            into[key] = from[key]
+            initial[key] = data[key]
         }
-        return from[key]
     }
 
     function nestedChange (key, value) {
@@ -93,7 +81,9 @@ function ObservStruct(initialData) {
             value._diff : value
 
         setNonEnumerable(state, "_diff", diff)
-        setState(state);
+        currentTransaction = state
+        obs.set(state)
+        currentTransaction = NO_TRANSACTION
     }
 
     function trackDiff(value) {
@@ -101,7 +91,11 @@ function ObservStruct(initialData) {
             return _set(value)
         }
 
-        var newState = extend(value)
+        var newState = {}
+        Object.keys(value).forEach(function(key){
+            newState[key] = typeof value[key] === "function" ?
+                value[key]() : value[key]
+        })
         setNonEnumerable(newState, "_diff", value)
         _set(newState)
     }
@@ -112,20 +106,33 @@ function ObservStruct(initialData) {
         }
 
         Object.keys(newValue).forEach(function (key) {
-
             if (data.hasOwnProperty(key)) {
                 if (typeof data[key] === "function" &&
                     data[key]() !== newValue[key]
                 ) {
-                    setNestedState(key, newValue[key])
+                    nestedTransaction = newValue[key];
+                    data[key].set(newValue[key]);
+                    nestedTransaction = NO_TRANSACTION
                 }
             } else {
-                add(data, newValue, key)
-                if (typeof data[key] === "function") {
-                    setNestedState(key, newValue[key]);
+                checkBlackList(key)
+                obs[key] = newValue[key]
+                if (typeof newValue[key] === "function") {
+                    nestedChange(key, newValue[key]())
+                    nestedTransaction = newValue[key]();
+                    newValue[key](nestedChange.bind(null, key))
+                    nestedTransaction = NO_TRANSACTION
                 }
+                //obs[key] = data[key] = newValue[key]
+                //if (typeof newValue[key] === "function") {
+                    //console.log(key, "is fn")
+                    //newValue[key](nestedChange.bind(null, key))
+                    //nestedTransaction = newValue[key]();
+                    //newValue[key].set(nestedTransaction);
+                    //nestedTransaction = NO_TRANSACTION
+                //}
             }
-
         })
     }
+
 }
